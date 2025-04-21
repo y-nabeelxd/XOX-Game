@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NEON XOX Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  .mode-select {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .mode-select button {
+    padding: 12px 25px;
+    font-size: 18px;
+    background: rgba(0,0,0,0.8);
+    color: #00f5c9;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px #00f5c9;
+    transition: 0.3s;
+  }
+
+  .mode-select button:hover {
+    background: rgba(0,0,0,0.9);
+  }
+
+  .turn-display {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: white;
+    text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+    animation: glowText 2s infinite alternate;
+  }
+
+  @keyframes glowText {
+    from { text-shadow: 0 0 10px #0ff; }
+    to { text-shadow: 0 0 20px #0ff, 0 0 40px #0ff; }
+  }
+
+  .board {
+    display: grid;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 0 30px #0ff, 0 0 60px #0ff;
+    position: relative;
+    animation: neonPulse 5s infinite alternate;
+  }
+
+  @keyframes neonPulse {
+    0% { box-shadow: 0 0 20px #0ff, 0 0 40px #0ff; }
+    100% { box-shadow: 0 0 40px #0ff, 0 0 80px #0ff; }
+  }
+
+  .cell {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+    color: white;
+    user-select: none;
+    position: relative;
+    box-shadow: 0 0 5px rgba(255,255,255,0.5);
+  }
+
+  .cell:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .x { color: red; text-shadow: 0 0 10px red, 0 0 20px red; }
+  .o { color: cyan; text-shadow: 0 0 10px cyan, 0 0 20px cyan; }
+
+  .play-again {
+    margin-top: 20px;
+    padding: 12px 25px;
+    font-size: 18px;
+    background: rgba(0,0,0,0.8);
+    color: #00f5c9;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    display: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px #00f5c9;
+    transition: 0.3s;
+  }
+
+  .play-again:hover {
+    background: rgba(0,0,0,0.9);
+  }
+
+  .result-dialog {
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    padding: 30px 50px;
+    color: #0ff;
+    font-size: 2rem;
+    box-shadow: 0 0 20px #0ff, 0 0 40px #0ff;
+    display: none;
+    text-align: center;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+
+<div class="mode-select" id="modeSelect">
+  <button onclick="startGame('robot')">Play with Robot</button>
+  <button onclick="startGame('1v1')">Play 1v1</button>
+</div>
+
+<div class="turn-display" id="turnDisplay" style="display:none;">X's Turn</div>
+<div class="board" id="board" style="display:none;"></div>
+<button class="play-again" id="playAgain">Play Again</button>
+
+<div class="result-dialog" id="resultDialog"></div>
+
+<script>
+const board = document.getElementById('board');
+const playAgainBtn = document.getElementById('playAgain');
+const turnDisplay = document.getElementById('turnDisplay');
+const resultDialog = document.getElementById('resultDialog');
+const modeSelect = document.getElementById('modeSelect');
+
+let currentPlayer = 'x';
+let cells = [];
+let gameMode = '1v1';
+
+function detectDevice() {
+  if (window.innerWidth <= 768) {
+    board.style.gridTemplateColumns = 'repeat(3, 90px)';
+    board.style.gridTemplateRows = 'repeat(3, 90px)';
+  } else {
+    board.style.gridTemplateColumns = 'repeat(3, 120px)';
+    board.style.gridTemplateRows = 'repeat(3, 120px)';
+  }
+}
+
+function startGame(mode) {
+  gameMode = mode;
+  modeSelect.style.display = 'none';
+  turnDisplay.style.display = 'block';
+  board.style.display = 'grid';
+  createBoard();
+}
+
+function createBoard() {
+  board.innerHTML = '';
+  currentPlayer = 'x';
+  updateTurnDisplay();
+  cells = [];
+  detectDevice();
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    cell.classList.add('cell');
+    cell.dataset.index = i;
+    cell.addEventListener('click', handleMove);
+    board.appendChild(cell);
+    cells.push(cell);
+  }
+}
+
+function handleMove(e) {
+  const cell = e.target;
+  if (cell.textContent !== '' || (gameMode === 'robot' && currentPlayer === 'o')) return;
+  makeMove(cell, currentPlayer);
+
+  if (checkWin(currentPlayer)) {
+    endGame(`${currentPlayer.toUpperCase()} Wins!`);
+    return;
+  }
+
+  if (isDraw()) {
+    endGame('Draw!');
+    return;
+  }
+
+  currentPlayer = currentPlayer === 'x' ? 'o' : 'x';
+  updateTurnDisplay();
+
+  if (gameMode === 'robot' && currentPlayer === 'o') {
+    setTimeout(botMove, 300);
+  }
+}
+
+function makeMove(cell, player) {
+  cell.textContent = player.toUpperCase();
+  cell.classList.add(player);
+}
+
+function updateTurnDisplay() {
+  turnDisplay.textContent = `${currentPlayer.toUpperCase()}'s Turn`;
+}
+
+function checkWin(player) {
+  const winCombos = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+  return winCombos.some(combo =>
+    combo.every(index => cells[index].textContent.toLowerCase() === player)
+  );
+}
+
+function isDraw() {
+  return cells.every(cell => cell.textContent !== '');
+}
+
+function endGame(message) {
+  playAgainBtn.style.display = 'block';
+  resultDialog.textContent = message;
+  resultDialog.style.display = 'block';
+  cells.forEach(cell => cell.removeEventListener('click', handleMove));
+}
+
+function botMove() {
+  let bestScore = -Infinity;
+  let move;
+  for (let i = 0; i < 9; i++) {
+    if (cells[i].textContent === '') {
+      cells[i].textContent = 'O';
+      let score = minimax(cells, 0, false);
+      cells[i].textContent = '';
+      if (score > bestScore) {
+        bestScore = score;
+        move = i;
+      }
+    }
+  }
+  makeMove(cells[move], 'o');
+
+  if (checkWin('o')) {
+    endGame('O Wins!');
+    return;
+  }
+
+  if (isDraw()) {
+    endGame('Draw!');
+    return;
+  }
+
+  currentPlayer = 'x';
+  updateTurnDisplay();
+}
+
+function minimax(boardCells, depth, isMaximizing) {
+  if (checkStaticWin('o')) return 10 - depth;
+  if (checkStaticWin('x')) return depth - 10;
+  if (boardCells.every(cell => cell.textContent !== '')) return 0;
+
+  if (isMaximizing) {
+    let bestScore = -Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (boardCells[i].textContent === '') {
+        boardCells[i].textContent = 'O';
+        let score = minimax(boardCells, depth + 1, false);
+        boardCells[i].textContent = '';
+        bestScore = Math.max(score, bestScore);
+      }
+    }
+    return bestScore;
+  } else {
+    let bestScore = Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (boardCells[i].textContent === '') {
+        boardCells[i].textContent = 'X';
+        let score = minimax(boardCells, depth + 1, true);
+        boardCells[i].textContent = '';
+        bestScore = Math.min(score, bestScore);
+      }
+    }
+    return bestScore;
+  }
+}
+
+function checkStaticWin(player) {
+  const winCombos = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+  return winCombos.some(combo =>
+    combo.every(index => cells[index].textContent.toLowerCase() === player)
+  );
+}
+
+playAgainBtn.addEventListener('click', () => {
+  playAgainBtn.style.display = 'none';
+  resultDialog.style.display = 'none';
+  createBoard();
+});
+
+window.addEventListener('resize', detectDevice);
+</script>
+
+</body>
+</html>
